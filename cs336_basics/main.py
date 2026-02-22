@@ -1,5 +1,5 @@
 import regex as re
-from collections import Counter
+from collections import Counter, defaultdict
 import time
 
 
@@ -7,74 +7,69 @@ import time
 #end = time.perf_counter()
 #print(f"Reading took {end-start:.4f} seconds")
 
-#with open("/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", "r") as f:
-#    text = f.read()
-#print(len(text))
+def get_pair_dict(words):
+    pair_to_count = Counter()
+    pair_to_words = defaultdict(set)
 
-#special_tokens = ["<|endoftext|>"]
-#patter = "|".join([re.escape(t) for t in special_tokens])
-#chunks = text.split(patter)
-
-#PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-
-#counter = Counter()
-
-#for chunk in chunks:
-#    words = [i.group() for i in re.finditer(PAT, chunk)]
-#    temp_counter = Counter(tuple(bytes([b]) for b in word.encode("utf-8")) for word in words)
-#    counter.update(temp_counter)
-
-#text = '''low low low low low
-#lower lower widest widest widest
-#newest newest newest newest newest newest
-#'''
-
-#text = text.split()
-#counter = Counter(tuple(bytes([b]) for b in word.encode("utf-8")) for word in text)
-#vocabulary = {i: bytes([i]) for i in range(256)}
-
-def get_top_merge(counter):
-    new_counter = {}
-    for string, count in counter.items():
-        for i in range(len(string)-1):
-            pair = (string[i], string[i+1])
-            new_counter[pair] = new_counter.get(pair, 0) + count
+    for word, count in words.items():
+        for i in range(len(word) - 1):
+            pair = (word[i], word[i+1])
+            pair_to_count[pair] += count
+            pair_to_words[pair].add(word)
     
-    maxx = max(new_counter.values())
-    top_merge = max({k:v for k,v in new_counter.items() if v == maxx})
-    return top_merge
+    return pair_to_count, pair_to_words
 
-def do_merge(counter, top_merge):
-    new_counter = {}
-    pair1, pair2 = top_merge
-    for string, count in counter.items():
-        if pair1 in string and pair2 in string:
-            current_string = []
-            i = 0
-            while i < len(string):
-                if i < len(string)-1 and string[i] == pair1 and string[i+1] == pair2:
-                    current_string.append(pair1+pair2)
-                    i += 2
-                else:
-                    current_string.append(string[i])
-                    i += 1
-            new_counter[tuple(current_string)] = count
+def merge_word(word, pair):
+    new_word = []
+
+    i = 0
+    while i < len(word):
+        if i < (len(word) - 1) and word[i] == pair[0] and word[i+1] == pair[1]:
+            new_word.append(word[i] + word[i+1])
+            i += 2
         else:
-            new_counter[tuple(string)] = count
-    return new_counter
+            new_word.append(word[i])
+            i += 1
+            
+    return tuple(new_word)
 
-def bpe(counter, vocabulary, max_iter):
+def bpe(words, vocabulary, max_iter):
     merges = []
+
+    pair_to_count, pair_to_words = get_pair_dict(words)
+
     for _ in range(max_iter):
-        top_merge = get_top_merge(counter)
-        merges.append(top_merge)
-        vocabulary[len(vocabulary)] = top_merge[0] + top_merge[1]
-        counter = do_merge(counter, top_merge)
+        top_pair = max(pair_to_count, key=lambda k: (pair_to_count[k], k))
+
+        affected_words = list(pair_to_words[top_pair])
+
+        for word in affected_words:
+            count = words.pop(word)
+
+            for i in range(len(word) - 1):
+                pair = (word[i], word[i+1])
+                pair_to_count[pair] -= count
+                pair_to_words[pair].discard(word)
+            
+            new_word = merge_word(word, top_pair)
+            words[new_word] = count
+
+            for i in range(len(new_word) - 1):
+                pair = (new_word[i], new_word[i+1])
+                pair_to_count[pair] += count
+                pair_to_words[pair].add(new_word)
+            
+        del pair_to_count[top_pair]
+        del pair_to_words[top_pair]
+        merges.append(top_pair)
+        vocabulary[len(vocabulary)] = top_pair[0] + top_pair[1]
+    
     return vocabulary, merges
+
 
 def main_bpe(input_path, vocab_size, special_tokens):
     assert vocab_size > 256 + len(special_tokens)
-    max_iter = vocab_size - (256 + len(special_tokens))
+
     with open(input_path, "r", encoding="utf-8") as f:
         text = f.read()
     
@@ -90,6 +85,7 @@ def main_bpe(input_path, vocab_size, special_tokens):
         counter.update(temp_counter)
     
     vocabulary = {i: bytes([i]) for i in range(256)}
+    max_iter = vocab_size - 256 - len(special_tokens)
     
     vocabulary, merges = bpe(counter, vocabulary, max_iter)
 
@@ -97,11 +93,3 @@ def main_bpe(input_path, vocab_size, special_tokens):
         vocabulary[len(vocabulary)] = t.encode("utf-8")
 
     return vocabulary, merges
-    
-    
-#path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
-#special_tokens = ["<|endoftext|>"]
-#v, m = main_bpe(path, 262, special_tokens)
-#v[len(v)] = "<|endoftext|>".encode("utf-8")
-#print(v)
-#print(m)

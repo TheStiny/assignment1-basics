@@ -1,0 +1,21 @@
+# Executable
+executable = /home/fast/dokpekpe/Experiments/cs336/assignment1-basics/assignment1.sh
+environment = "PATH=/home/dokpekpe/.local/bin:/usr/bin:/bin"
+getenv = True
+
+periodic_hold = (ResidentSetSize > RequestMemory * 1024)
+periodic_remove = (JobStatus == 5)
+
+# Logs
+error = job.$(Cluster).$(Process).err
+output = job.$(Cluster).$(Process).out
+log = job.$(Cluster).$(Process).log
+
+# Compute requests
+request_memory = 80000
+request_cpus = 8
+request_gpus = 1
+requirements = (TARGET.CUDACapability == 9.0) && (CUDAGlobalMemoryMb >= 80000) 
+
+# Submit 1 job
+queue

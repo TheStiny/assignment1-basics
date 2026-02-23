@@ -4,6 +4,9 @@ import time
 from typing import TypeAlias
 import json
 import resource
+import os
+from pathlib import Path
+
 
 Word: TypeAlias = tuple[bytes, ...]
 Pair: TypeAlias = tuple[bytes, bytes]
@@ -100,10 +103,11 @@ def main_bpe(
 
     print(f"There are {len(chunks)} chunks")
 
+    byte_list = [bytes([i]) for i in range(256)]
     for i, chunk in enumerate(chunks):
-        print(f"Processing chunk {i+1}/{len(chunks)}")
+        if i % 100_000 == 0:
+            print(f"Processing chunk {i}/{len(chunks)}")
         words = (i.group() for i in re.finditer(PAT, chunk))
-        byte_list = [bytes([i]) for i in range(256)]
         temp_counter = Counter(tuple(byte_list[b] for b in word.encode("utf-8")) for word in words)
         counter.update(temp_counter)
     
@@ -119,7 +123,10 @@ def main_bpe(
 
     return vocabulary, merges
 
-input_path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
+script_dir = Path(__file__).parent.absolute()
+
+input_path = script_dir.parent / "data/TinyStoriesV2-GPT4-train.txt"
+#input_path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
 vocab_size = 10_000
 special_tokens = ["<|endoftext|>"]
 
@@ -134,15 +141,21 @@ print("End of training")
 print(f"Training took: {(end-start)/60:.4f} minutes")
 
 peak_memory_gb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+print(f"Peak memory usage: {peak_memory_gb} GB")
 
 readable_vocab = {k: v.decode("latin-1") for k, v in vocab.items()}
 readable_merges = [[merge[0].decode("latin-1"), merge[1].decode("latin-1")] for merge in merges]
 
-with open("./output/vocab.json", "w", encoding="utf-8") as f:
+output_dir = script_dir.parent / "output"
+output_dir.mkdir(parents=True, exist_ok=True)
+vocab_dir = output_dir / "vocab.json"
+merges_dir = output_dir / "merges.json"
+
+with open(vocab_dir, "w", encoding="utf-8") as f:
     json.dump(readable_vocab, f, indent=4)
 
-with open("./output/merges.json", "w", encoding="utf-8") as f:
+with open(merges_dir, "w", encoding="utf-8") as f:
     json.dump(readable_merges, f, indent=4)
 
-longest_token = max(readable_vocab.values(), key=len)
-print(f"The longest token is: {longest_token} with lenght {len(longest_token)}")
+longest_token = max(vocab.values(), key=len)
+print(f"The longest token is: {longest_token.decode("utf-8", errors="replace")} with lenght {len(longest_token)}")

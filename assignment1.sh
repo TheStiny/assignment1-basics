@@ -2,6 +2,7 @@
 
 # 1. Manually set the directory to be safe
 export MY_DIR=/home/fast/dokpekpe/Experiments/cs336/assignment1-basics
+export PYTHONUNBUFFERED=1
 cd "$MY_DIR"
 
 # 2. Define the exact path to the uv tool
@@ -37,5 +38,6 @@ fi
 #nvidia-smi
 
 
-$UV_BIN run $MY_DIR/cs336_basics/main.py
+#$UV_BIN run $MY_DIR/cs336_basics/main.py
 #$UV_BIN run pytest $MY_DIR/tests/test_train_bpe.py
+$UV_BIN run python -m cProfile -s tottime $MY_DIR/cs336_basics/main.py > profile_results.txt

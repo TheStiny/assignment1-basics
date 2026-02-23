@@ -98,7 +98,10 @@ def main_bpe(
 
     counter = Counter()
 
-    for chunk in chunks:
+    print(f"There are {len(chunks)} chunks")
+
+    for i, chunk in enumerate(chunks):
+        print(f"Processing chunk {i+1}/{len(chunks)}")
         words = (i.group() for i in re.finditer(PAT, chunk))
         byte_list = [bytes([i]) for i in range(256)]
         temp_counter = Counter(tuple(byte_list[b] for b in word.encode("utf-8")) for word in words)
@@ -115,3 +118,31 @@ def main_bpe(
 
 
     return vocabulary, merges
+
+input_path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
+vocab_size = 10_000
+special_tokens = ["<|endoftext|>"]
+
+print("Start training")
+start = time.perf_counter()
+
+vocab, merges = main_bpe(input_path, vocab_size, special_tokens)
+
+end = time.perf_counter()
+print("End of training")
+
+print(f"Training took: {(end-start)/60:.4f} minutes")
+
+peak_memory_gb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+
+readable_vocab = {k: v.decode("latin-1") for k, v in vocab.items()}
+readable_merges = [[merge[0].decode("latin-1"), merge[1].decode("latin-1")] for merge in merges]
+
+with open("./output/vocab.json", "w", encoding="utf-8") as f:
+    json.dump(readable_vocab, f, indent=4)
+
+with open("./output/merges.json", "w", encoding="utf-8") as f:
+    json.dump(readable_merges, f, indent=4)
+
+longest_token = max(readable_vocab.values(), key=len)
+print(f"The longest token is: {longest_token} with lenght {len(longest_token)}")

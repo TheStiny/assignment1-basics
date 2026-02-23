@@ -34,8 +34,8 @@ fi
 
 
 # 7. GPU info
-nvidia-smi
+#nvidia-smi
 
 
-#$UV_BIN run $MY_DIR/cs336_basics/main.py
-$UV_BIN run pytest $MY_DIR/tests/test_train_bpe.py
+$UV_BIN run $MY_DIR/cs336_basics/main.py
+#$UV_BIN run pytest $MY_DIR/tests/test_train_bpe.py

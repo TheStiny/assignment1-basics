@@ -56,8 +56,11 @@ def bpe(
 
     pair_to_count, pair_to_words = get_pair_dict(words)
 
-    for _ in range(max_iter):
-        top_pair = max(pair_to_count, key=lambda k: (pair_to_count[k], k))
+    for iter in range(max_iter):
+        if iter % 1000 == 0:
+            print(f"BPE at iteration {iter}/{max_iter}", flush=True)
+        #top_pair = max(pair_to_count, key=lambda k: (pair_to_count[k], k))
+        top_pair = max((pair_to_count[pair], pair) for pair in pair_to_count)[1]
 
         affected_words = list(pair_to_words[top_pair])
 
@@ -68,6 +71,12 @@ def bpe(
                 pair = (word[i], word[i+1])
                 pair_to_count[pair] -= count
                 pair_to_words[pair].discard(word)
+
+                if pair_to_count[pair] <= 0:
+                    pair_to_count.pop(pair, None)
+
+                if len(pair_to_words) == 0:
+                    pair_to_words.pop(pair, None)
             
             new_word = merge_word(word, top_pair)
             words[new_word] = count
@@ -77,8 +86,9 @@ def bpe(
                 pair_to_count[pair] += count
                 pair_to_words[pair].add(new_word)
             
-        del pair_to_count[top_pair]
-        del pair_to_words[top_pair]
+        pair_to_count.pop(top_pair, None)
+        pair_to_words.pop(top_pair, None)
+
         merges.append(top_pair)
         vocabulary[len(vocabulary)] = top_pair[0] + top_pair[1]
     
@@ -105,8 +115,8 @@ def main_bpe(
 
     byte_list = [bytes([i]) for i in range(256)]
     for i, chunk in enumerate(chunks):
-        if i % 100_000 == 0:
-            print(f"Processing chunk {i}/{len(chunks)}")
+        if i % 5_000 == 0:
+            print(f"Processing chunk {i}/{len(chunks)}", flush=True)
         words = (i.group() for i in re.finditer(PAT, chunk))
         temp_counter = Counter(tuple(byte_list[b] for b in word.encode("utf-8")) for word in words)
         counter.update(temp_counter)
@@ -125,9 +135,12 @@ def main_bpe(
 
 script_dir = Path(__file__).parent.absolute()
 
-input_path = script_dir.parent / "data/TinyStoriesV2-GPT4-train.txt"
+#input_path = script_dir.parent / "data/TinyStoriesV2-GPT4-train.txt" #2.7 M chunks
+#vocab_size = 10_000
+input_path = script_dir.parent / "data/owt_valid.txt" # 60 k chunks
+vocab_size = 32_000
 #input_path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
-vocab_size = 10_000
+
 special_tokens = ["<|endoftext|>"]
 
 print("Start training")
@@ -148,8 +161,8 @@ readable_merges = [[merge[0].decode("latin-1"), merge[1].decode("latin-1")] for 
 
 output_dir = script_dir.parent / "output"
 output_dir.mkdir(parents=True, exist_ok=True)
-vocab_dir = output_dir / "vocab.json"
-merges_dir = output_dir / "merges.json"
+vocab_dir = output_dir / "vocabTS.json"
+merges_dir = output_dir / "mergesTS.json"
 
 with open(vocab_dir, "w", encoding="utf-8") as f:
     json.dump(readable_vocab, f, indent=4)

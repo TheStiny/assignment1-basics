@@ -1,13 +1,21 @@
 import regex as re
 from collections import Counter, defaultdict
 import time
+from typing import TypeAlias
+import json
+import resource
+
+Word: TypeAlias = tuple[bytes, ...]
+Pair: TypeAlias = tuple[bytes, bytes]
 
 
 #start = time.perf_counter()
 #end = time.perf_counter()
 #print(f"Reading took {end-start:.4f} seconds")
 
-def get_pair_dict(words):
+def get_pair_dict(
+    words: dict[Word, int]
+) -> tuple[dict[Pair, int], dict[Pair, Word]]:
     pair_to_count = Counter()
     pair_to_words = defaultdict(set)
 
@@ -19,7 +27,10 @@ def get_pair_dict(words):
     
     return pair_to_count, pair_to_words
 
-def merge_word(word, pair):
+def merge_word(
+    word: Word, 
+    pair: Pair
+) -> Word:
     new_word = []
 
     i = 0
@@ -33,7 +44,11 @@ def merge_word(word, pair):
             
     return tuple(new_word)
 
-def bpe(words, vocabulary, max_iter):
+def bpe(
+    words: dict[Word, int], 
+    vocabulary: dict[int, bytes], 
+    max_iter: int
+) -> tuple[dict[int, bytes], list[Pair]]:
     merges = []
 
     pair_to_count, pair_to_words = get_pair_dict(words)
@@ -67,7 +82,11 @@ def bpe(words, vocabulary, max_iter):
     return vocabulary, merges
 
 
-def main_bpe(input_path, vocab_size, special_tokens):
+def main_bpe(
+    input_path: str, 
+    vocab_size: int, 
+    special_tokens: list[str]
+) -> tuple[dict[int, bytes], list[Pair]]:
     assert vocab_size > 256 + len(special_tokens)
 
     with open(input_path, "r", encoding="utf-8") as f:
@@ -80,16 +99,19 @@ def main_bpe(input_path, vocab_size, special_tokens):
     counter = Counter()
 
     for chunk in chunks:
-        words = [i.group() for i in re.finditer(PAT, chunk)]
-        temp_counter = Counter(tuple(bytes([b]) for b in word.encode("utf-8")) for word in words)
+        words = (i.group() for i in re.finditer(PAT, chunk))
+        byte_list = [bytes([i]) for i in range(256)]
+        temp_counter = Counter(tuple(byte_list[b] for b in word.encode("utf-8")) for word in words)
         counter.update(temp_counter)
     
     vocabulary = {i: bytes([i]) for i in range(256)}
     max_iter = vocab_size - 256 - len(special_tokens)
     
     vocabulary, merges = bpe(counter, vocabulary, max_iter)
+    
 
     for t in special_tokens:
         vocabulary[len(vocabulary)] = t.encode("utf-8")
+
 
     return vocabulary, merges

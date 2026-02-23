@@ -40,4 +40,4 @@ fi
 
 $UV_BIN run $MY_DIR/cs336_basics/main.py
 #$UV_BIN run pytest $MY_DIR/tests/test_train_bpe.py
-#$UV_BIN run python -m cProfile -s tottime $MY_DIR/cs336_basics/main.py | tee profile_results.txt
+#$UV_BIN run python -m cProfile -s tottime $MY_DIR/cs336_basics/main.py | tee profile_results2.txt

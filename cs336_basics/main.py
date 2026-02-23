@@ -4,13 +4,11 @@ import time
 from typing import TypeAlias
 import json
 import resource
-import os
 from pathlib import Path
 
 
 Word: TypeAlias = tuple[bytes, ...]
 Pair: TypeAlias = tuple[bytes, bytes]
-
 
 #start = time.perf_counter()
 #end = time.perf_counter()
@@ -19,6 +17,7 @@ Pair: TypeAlias = tuple[bytes, bytes]
 def get_pair_dict(
     words: dict[Word, int]
 ) -> tuple[dict[Pair, int], dict[Pair, Word]]:
+    
     pair_to_count = Counter()
     pair_to_words = defaultdict(set)
 
@@ -34,6 +33,7 @@ def merge_word(
     word: Word, 
     pair: Pair
 ) -> Word:
+    
     new_word = []
 
     i = 0
@@ -52,13 +52,14 @@ def bpe(
     vocabulary: dict[int, bytes], 
     max_iter: int
 ) -> tuple[dict[int, bytes], list[Pair]]:
+    
     merges = []
-
     pair_to_count, pair_to_words = get_pair_dict(words)
 
     for iter in range(max_iter):
         if iter % 1000 == 0:
             print(f"BPE at iteration {iter}/{max_iter}", flush=True)
+
         #top_pair = max(pair_to_count, key=lambda k: (pair_to_count[k], k))
         top_pair = max((pair_to_count[pair], pair) for pair in pair_to_count)[1]
 
@@ -75,7 +76,7 @@ def bpe(
                 if pair_to_count[pair] <= 0:
                     pair_to_count.pop(pair, None)
 
-                if len(pair_to_words) == 0:
+                if len(pair_to_words[pair]) == 0:
                     pair_to_words.pop(pair, None)
             
             new_word = merge_word(word, top_pair)
@@ -95,32 +96,44 @@ def bpe(
     return vocabulary, merges
 
 
+def stream_chunks(input_path: str, special_tokens: list[str]):
+    pattern = "|".join([re.escape(t) for t in special_tokens])
+    with open(input_path, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = re.split(pattern, line)
+            for part in parts:
+                if part:
+                    yield part
+
 def main_bpe(
     input_path: str, 
     vocab_size: int, 
     special_tokens: list[str]
 ) -> tuple[dict[int, bytes], list[Pair]]:
+    
     assert vocab_size > 256 + len(special_tokens)
 
-    with open(input_path, "r", encoding="utf-8") as f:
-        text = f.read()
-    
-    pattern = "|".join([re.escape(t) for t in special_tokens])
-    chunks = re.split(pattern, text)
     PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
     counter = Counter()
-
-    print(f"There are {len(chunks)} chunks")
-
     byte_list = [bytes([i]) for i in range(256)]
-    for i, chunk in enumerate(chunks):
-        if i % 5_000 == 0:
-            print(f"Processing chunk {i}/{len(chunks)}", flush=True)
+
+
+    start = time.perf_counter()
+    print("Start reading file")
+
+    for chunk in stream_chunks(input_path, special_tokens):
         words = (i.group() for i in re.finditer(PAT, chunk))
-        temp_counter = Counter(tuple(byte_list[b] for b in word.encode("utf-8")) for word in words)
-        counter.update(temp_counter)
+
+        for word in words:
+            word_bytes = tuple(byte_list[b] for b in word.encode("utf-8"))
+            counter[word_bytes] += 1
     
+    
+    end = time.perf_counter()   
+    print("End reading file")
+    print(f"Loading data took: {(end-start)/60:.4f} minutes")
+
     vocabulary = {i: bytes([i]) for i in range(256)}
     max_iter = vocab_size - 256 - len(special_tokens)
     
@@ -135,11 +148,10 @@ def main_bpe(
 
 script_dir = Path(__file__).parent.absolute()
 
-#input_path = script_dir.parent / "data/TinyStoriesV2-GPT4-train.txt" #2.7 M chunks
-#vocab_size = 10_000
-input_path = script_dir.parent / "data/owt_valid.txt" # 60 k chunks
-vocab_size = 32_000
-#input_path = "/home/fast/dokpekpe/Experiments/cs336/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
+input_path = script_dir.parent / "data/TinyStoriesV2-GPT4-train.txt" 
+vocab_size = 10_000
+#input_path = script_dir.parent / "data/owt_train.txt"
+#vocab_size = 32_000
 
 special_tokens = ["<|endoftext|>"]
 

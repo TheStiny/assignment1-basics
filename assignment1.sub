@@ -13,7 +13,7 @@ log = job.$(Cluster).$(Process).log
 
 # Compute requests
 request_memory = 80000
-request_cpus = 1
+request_cpus = 8
 # request_gpus = 1
 # requirements = (TARGET.CUDACapability == 9.0) && (CUDAGlobalMemoryMb >= 80000) 
 
